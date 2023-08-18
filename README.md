@@ -1,2 +1,3 @@
-# norns-scripting
+# copypasta
+
 A skeleton for a norns script
