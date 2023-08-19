@@ -17,8 +17,8 @@ Engine_CopyPasta : CroneEngine {
 		^super.new(context, doneCallback);
 	}
 
-	// off and on are general functions
-	// to play and free synthdefs
+	// off searches for the id in the dictionary
+	// and sets the gate to 0
 	off {
 		arg synthdef, id;
 
@@ -31,11 +31,12 @@ Engine_CopyPasta : CroneEngine {
 		});
 	}
 
+	// on is a general function to trigger a synthdef,
+	// adding busses if needed and setting it in front of main
 	on {
 		arg synthdef, id, args;
 		
 		["on",synthdef,id,args].postln;
-		params.postln;
 
 		// add the buses to the args
 		args=args++[
@@ -68,12 +69,12 @@ Engine_CopyPasta : CroneEngine {
 		// initialize the synthdefs 
 
 		// nice kick drum I use a lot
-		SynthDef("kick", { |note=20, ratio = 6, sweeptime = 0.05, predb = 0, db = 0,
+		SynthDef("kick", { |note=20, ratio = 6, sweeptime = 50, predb = 0, db = 0,
 			decay1 = 0.3, decay1L = 0.8, decay2 = 0.15, clicky=0.0, 
 			busMain, busDelay, busReverb,sendDelay=0, sendReverb = 0|
 			var snd;
 			var basefreq = note.midicps;
-			var fcurve = EnvGen.kr(Env([basefreq * ratio, basefreq], [sweeptime], \exp)),
+			var fcurve = EnvGen.kr(Env([basefreq * ratio, basefreq], [sweeptime/1000], \exp)),
 			env = EnvGen.kr(Env([clicky,1, decay1L, 0], [0.0,decay1, decay2], -4), doneAction: Done.freeSelf),
 			sig = SinOsc.ar(fcurve, 0.5pi, predb.dbamp).distort * env ;
 			snd = (sig*db.dbamp).tanh!2;
@@ -83,9 +84,10 @@ Engine_CopyPasta : CroneEngine {
 		}).send(s);
 
 		// my favorite synth sound
-		SynthDef("synth",{ | amp=0.75,note=40, mix=1.0, detune = 0.4,lpf=10,gate=1,
+		SynthDef("synth",{ | db=0,note=40, mix=1.0, detune = 0.4,lpf=10,gate=1,
 			busMain, busDelay, busReverb,sendDelay=0, sendReverb = 0|
 			var snd;
+			var amp=db.dbamp;
 			var freq=note.midicps;
 			var detuneCurve = { |x|
 				(10028.7312891634*x.pow(11)) -
@@ -123,21 +125,29 @@ Engine_CopyPasta : CroneEngine {
 			sig = HPF.ar(sig ! 2, freq);
 			sig = BLowPass.ar(sig,freq*LFNoise2.kr(1).range(4,20),1/0.707);
 			sig = Pan2.ar(sig);
-			snd = sig * amp * 0.8;
+			snd = sig * amp * 6.neg.dbamp;
 			snd = snd * EnvGen.ar(Env.adsr(0.1,1,0.9,3),gate,doneAction:2);
+			snd = snd * EnvGen.ar(Env.new([1,1,0],[30,2]),doneAction:2); // prevent from living forever
 			Out.ar(busMain,(1-sendDelay)*(1-sendReverb)*snd);
 			Out.ar(busDelay,sendDelay*snd);
 			Out.ar(busReverb,sendReverb*snd);
 		}).send(s);
 
 		// OPINION: use main synthdef with main effects
-		SynthDef("main", { |busMain, busDelay, busReverb|
+		SynthDef("main", { |secondsPerBeat=0.2,delayBeats=4,delayFeedback=0.5,
+			busMain, busDelay, busReverb|
 			var sndMain,sndDelay,sndReverb;
 			sndMain = In.ar(busMain,2);
-			sndDelay = CombC.ar(In.ar(busDelay,2),0.1,0.1,1);
+			sndDelay = CombC.ar(
+				In.ar(busDelay,2),
+				2,
+				Lag.kr(secondsPerBeat*delayBeats,2),
+				Lag.kr(secondsPerBeat*delayBeats*LinLin.kr(delayFeedback,0,1,2,128),2),// delayFeedback should vary between 2 and 128
+			);
 			sndReverb = In.ar(busReverb,2);
 			sndReverb = Fverb.ar(sndReverb[0],sndReverb[1]);
-			Out.ar(0,sndMain+sndDelay+sndReverb);
+			sndMain = sndMain+sndDelay+sndReverb;
+			Out.ar(0,sndMain);
 		}).send(s);
 
 		 // initialize all the dictionaries
@@ -215,17 +225,15 @@ Engine_CopyPasta : CroneEngine {
 		});
 
 		// OPINION: its nice to have specific commands for different instruments.
-		this.addCommand("synth_on","ff", { arg msg;
-			var synthdef="synth".asString; // this simply makes it easy to copy the code
+		this.addCommand("synth_on","f", { arg msg;
+			var synthdef="synth".asString;
 			var note=msg[1];
-			var velocity=msg[2];
 
 			// create id for synth for freeing purposes
 			var id=synthdef++note.round.asInteger;
 
 			var args = [
 				note: note,
-				velocity: velocity;
 			];
 
 			this.on(synthdef,id,args);
