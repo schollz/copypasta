@@ -11,8 +11,7 @@ end
 
 function Kick:init()
   self.params={
-    {id="note",name="note",min=10,max=120,exp=false,div=1,default=32,
-    formatter=formatter=function(param) return musicutil.note_num_to_name(param:get(),true) end},
+    {id="note",name="note",min=10,max=120,exp=false,div=1,default=32,formatter=function(param) return musicutil.note_num_to_name(param:get(),true) end},
     {id="predb",name="preamp",min=-96,max=16,exp=false,div=0.1,default=0,unit="dB"},
     {id="db",name="postamp",min=-96,max=16,exp=false,div=0.1,default=0,unit="dB"},
     {id="ratio",name="ratio",min=1,max=20,exp=false,div=1,default=6},

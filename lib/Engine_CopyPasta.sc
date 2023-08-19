@@ -34,6 +34,9 @@ Engine_CopyPasta : CroneEngine {
 	on {
 		arg synthdef, id, args;
 		
+		["on",synthdef,id,args].postln;
+		params.postln;
+
 		// add the buses to the args
 		args=args++[
 			busMain: buses.at("busMain"),
@@ -42,16 +45,16 @@ Engine_CopyPasta : CroneEngine {
 		];
 
 		// args with everything in memory
-		params.at(key).keysValuesDo({ arg k, v;
+		params.at(synthdef).keysValuesDo({ arg k, v;
 			args=args++[k,v];
 		});
 
 		// free any synth if it exists
-		off.(synthdef,id);
+		this.off(synthdef,id);
 
 		// create the synth before the main
-		syns.at(key).put(id,Synth.before(syns.at("main"),synthdef,args).onFree({
-			["[CopyPasta] stopped playing synth",key,id].postln;
+		syns.at(synthdef).put(id,Synth.before(syns.at("main").at("main"),synthdef,args).onFree({
+			["[CopyPasta] stopped playing synthdef",synthdef,id].postln;
 		}));
 
 		// watch the new one
@@ -156,21 +159,21 @@ Engine_CopyPasta : CroneEngine {
 
 		// OPINION: keep parameters/synth for each entity in a dictionary of dictionaries
 		//          here I have a "synth" and "kick" that need parameters, synths
-		params.put("kick",Dictionary.new());
-		params.put("synth",Dictionary.new());
-		syns.put("kick",Dictionary.new());
-		syns.put("synth",Dictionary.new());
+		["kick","synth","main"].do({ arg synthdef;
+			params.put(synthdef,Dictionary.new());
+			syns.put(synthdef,Dictionary.new());
+		});
 
 		// sync up the server
 		s.sync;
 
 		// create the main output synth
-		syns.put("main",Synth.new("main",[
+		syns.at("main").put("main",Synth.new("main",[
 			busMain: buses.at("busMain"),
 			busDelay: buses.at("busDelay"),
 			busReverb: buses.at("busReverb"),
 		]));
-		NodeWatcher.register(syns.at("main"));
+		NodeWatcher.register(syns.at("main").at("main"));
 
 
 		// OPINION: use one "set" function for everything
@@ -178,17 +181,23 @@ Engine_CopyPasta : CroneEngine {
 		//			all running synths get updated immediately.
 		// 			this function works for both kick + synth.
 		this.addCommand("set","ssf",{ arg msg;
-			var id=msg[1]; // "synth" or "kick"
+			var synthdef=msg[1].asString; // "synth" or "kick"
 			var k=msg[2]; 
 			var v=msg[3];
+			["set",synthdef,k,v].postln;
+
+			if (params.at(synthdef).isNil,{
+				params.put(synthdef,Dictionary.new());
+				syns.put(synthdef,Dictionary.new());
+			});
 
 			// update the parameters
-			params.at(id).put(k,v);
+			params.at(synthdef).put(k,v);
 
 			// update all running synths
-			syns.at(id).keysValuesDo({ arg name, syn;
+			syns.at(synthdef).keysValuesDo({ arg name, syn;
 				if (syn.isRunning,{
-					["[CopyPasta] setting syn",id,name,k,"=",v].postln;
+					["[CopyPasta] setting syn",synthdef,name,k,"=",v].postln;
 					syn.set(k,v);
 				});
 			});
@@ -196,18 +205,18 @@ Engine_CopyPasta : CroneEngine {
 
 
 		this.addCommand("synth_off","f", { arg msg;
-			var synthdef="synth";
+			var synthdef="synth".asString;
 			var note=msg[1];
 
 			// create id for synth for freeing purposes
 			var id="synth"++note.round.asInteger;
 
-			off.(synthdef,id);
+			this.off(synthdef,id);
 		});
 
 		// OPINION: its nice to have specific commands for different instruments.
 		this.addCommand("synth_on","ff", { arg msg;
-			var synthdef="synth"; // this simply makes it easy to copy the code
+			var synthdef="synth".asString; // this simply makes it easy to copy the code
 			var note=msg[1];
 			var velocity=msg[2];
 
@@ -219,14 +228,14 @@ Engine_CopyPasta : CroneEngine {
 				velocity: velocity;
 			];
 
-			on.(synthdef,id,args);
+			this.on(synthdef,id,args);
 		});
 
 		this.addCommand("kick_on","", { arg msg;
-			var synthdef="kick";
+			var synthdef="kick".asString;
 			var id=synthdef;
 
-			on.(synthdef,id,[]);
+			this.on(synthdef,id,[]);
 		});
 
 	}

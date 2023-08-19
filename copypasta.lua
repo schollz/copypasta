@@ -11,7 +11,7 @@
 
 -- includes will include anything and everything
 -- needed by the added classes
-musicutil=require("MusicUtil")
+musicutil=require("musicutil")
 
 -- OPINION: paging is done by having classes
 -- for each page that has a "enc",
@@ -29,15 +29,15 @@ engine.name=installer:ready() and 'CopyPasta' or nil
 
 function init()
   -- check the installer
-  if not installer:ready() then
-    clock.run(function()
-      while true do
-        redraw()
-        clock.sleep(1/5)
-      end
-    end)
-    do return end
-  end
+  -- if not installer:ready() then
+  --   clock.run(function()
+  --     while true do
+  --       redraw()
+  --       clock.sleep(1/5)
+  --     end
+  --   end)
+  --   do return end
+  -- end
 
   -- setup the paging by initializing the classes
   table.insert(pages,synth_:new())
@@ -50,12 +50,12 @@ function init()
   -- OPINION: refresh the screen at 15 fps
   -- ALTERNATIVE: refresh the screen
   -- only when "dirty"
-  clock.run(function()
-    while true do
-      clock.sleep(1/15)
-      redraw()
-    end
-  end)
+  -- clock.run(function()
+  --   while true do
+  --     clock.sleep(1/15)
+  --     redraw()
+  --   end
+  -- end)
 end
 
 function key(k,z)
