@@ -13,8 +13,6 @@
 -- needed by the added classes
 musicutil=require("MusicUtil")
 
-engine.name="CopyPasta"
-
 -- OPINION: paging is done by having classes
 -- for each page that has a "enc",
 --"key", and "redraw" function
@@ -23,7 +21,24 @@ synth_=include("lib/synth")
 page_current=1
 pages={}
 
+-- OPINION: use "scinstaller" for managing 3rd party engines
+--          this uses .gitmodules "scinstaller" to manage installation
+installer_=include("lib/scinstaller/scinstaller")
+installer=installer_:new{requirements={"Fverb"},zip="https://github.com/schollz/portedplugins/releases/download/v0.4.5/PortedPlugins-RaspberryPi.zip"}
+engine.name=installer:ready() and 'CopyPasta' or nil
+
 function init()
+  -- check the installer
+  if not installer:ready() then
+    clock.run(function()
+      while true do
+        redraw()
+        clock.sleep(1/5)
+      end
+    end)
+    do return end
+  end
+
   -- setup the paging by initializing the classes
   table.insert(pages,synth_:new())
   table.insert(pages,kick_:new())
@@ -44,10 +59,19 @@ function init()
 end
 
 function key(k,z)
+  if not installer:ready() then
+    installer:key(k,z)
+    do return end
+  end
+  -- page
   pages[page_current]:key(k,z)
 end
 
 function enc(k,d)
+  if not installer:ready() then
+    do return end
+  end
+
   if k==1 then
     page_current=util.wrap(page_current+d,1,#pages)
   else
@@ -56,6 +80,11 @@ function enc(k,d)
 end
 
 function redraw()
+  if not installer:ready() then
+    installer:redraw()
+    do return end
+  end
+
   screen.clear()
 
   pages[page_current]:redraw()

@@ -17,6 +17,47 @@ Engine_CopyPasta : CroneEngine {
 		^super.new(context, doneCallback);
 	}
 
+	// off and on are general functions
+	// to play and free synthdefs
+	off {
+		arg synthdef, id;
+
+		// free any synth if it exists
+		if (syns.at(synthdef).at(id).notNil,{
+			if (syns.at(synthdef).at(id).isRunning,{
+				// this will free synth
+				syns.at(synthdef).at(id).set(\gate,0);
+			});
+		});
+	}
+
+	on {
+		arg synthdef, id, args;
+		
+		// add the buses to the args
+		args=args++[
+			busMain: buses.at("busMain"),
+			busDelay: buses.at("busDelay"),
+			busReverb: buses.at("busReverb"),
+		];
+
+		// args with everything in memory
+		params.at(key).keysValuesDo({ arg k, v;
+			args=args++[k,v];
+		});
+
+		// free any synth if it exists
+		off.(synthdef,id);
+
+		// create the synth before the main
+		syns.at(key).put(id,Synth.before(syns.at("main"),synthdef,args).onFree({
+			["[CopyPasta] stopped playing synth",key,id].postln;
+		}));
+
+		// watch the new one
+		NodeWatcher.register(syns.at(synthdef).at(id));
+	}
+
 	alloc {
 		// CopyPasta specific v0.0.1
 		var s=context.server;
@@ -24,14 +65,15 @@ Engine_CopyPasta : CroneEngine {
 		// initialize the synthdefs 
 
 		// nice kick drum I use a lot
-		SynthDef("kick", { |basefreq = 40, ratio = 6, sweeptime = 0.05, preamp = 1, amp = 1,
+		SynthDef("kick", { |note=20, ratio = 6, sweeptime = 0.05, predb = 0, db = 0,
 			decay1 = 0.3, decay1L = 0.8, decay2 = 0.15, clicky=0.0, 
 			busMain, busDelay, busReverb,sendDelay=0, sendReverb = 0|
 			var snd;
-			var    fcurve = EnvGen.kr(Env([basefreq * ratio, basefreq], [sweeptime], \exp)),
+			var basefreq = note.midicps;
+			var fcurve = EnvGen.kr(Env([basefreq * ratio, basefreq], [sweeptime], \exp)),
 			env = EnvGen.kr(Env([clicky,1, decay1L, 0], [0.0,decay1, decay2], -4), doneAction: Done.freeSelf),
-			sig = SinOsc.ar(fcurve, 0.5pi, preamp).distort * env ;
-			snd = (sig*amp).tanh!2;
+			sig = SinOsc.ar(fcurve, 0.5pi, predb.dbamp).distort * env ;
+			snd = (sig*db.dbamp).tanh!2;
 			Out.ar(busMain,(1-sendDelay)*(1-sendReverb)*snd);
 			Out.ar(busDelay,sendDelay*snd);
 			Out.ar(busReverb,sendReverb*snd);
@@ -42,7 +84,6 @@ Engine_CopyPasta : CroneEngine {
 			busMain, busDelay, busReverb,sendDelay=0, sendReverb = 0|
 			var snd;
 			var freq=note.midicps;
-			var env=EnvGen.ar(Env.perc(Rand(0.1,1)*timeScale/4,Rand(0.5,2)*timeScale,1,[4,-4]),doneAction:2);
 			var detuneCurve = { |x|
 				(10028.7312891634*x.pow(11)) -
 				(50818.8652045924*x.pow(10)) +
@@ -155,56 +196,37 @@ Engine_CopyPasta : CroneEngine {
 
 
 		this.addCommand("synth_off","f", { arg msg;
-			var key="synth";
+			var synthdef="synth";
 			var note=msg[1];
 
 			// create id for synth for freeing purposes
 			var id="synth"++note.round.asInteger;
 
-			// free any synth if it exists
-			if (syns.at(key).at(id).notNil,{
-				if (syns.at(key).at(id).isRunning,{
-					// this will free synth
-					syns.at(key).at(id).set(\gate,0);
-				});
-			});
+			off.(synthdef,id);
 		});
 
 		// OPINION: its nice to have specific commands for different instruments.
 		this.addCommand("synth_on","ff", { arg msg;
-			var key="synth"; // this simply makes it easy to copy the code
+			var synthdef="synth"; // this simply makes it easy to copy the code
 			var note=msg[1];
 			var velocity=msg[2];
 
 			// create id for synth for freeing purposes
-			var id=key++note.round.asInteger;
+			var id=synthdef++note.round.asInteger;
 
-			// setup basic args
-			var args=[
-				busMain: buses.at("busMain"),
-				busDelay: buses.at("busDelay"),
-				busReverb: buses.at("busReverb"),
+			var args = [
+				note: note,
+				velocity: velocity;
 			];
-			// args with everything in memory
-			params.at(key).keysValuesDo({ arg k, v;
-				args=args++[k,v];
-			});
 
-			// free any synth if it exists
-			if (syns.at(key).at(id).notNil,{
-				if (syns.at(key).at(id).isRunning,{
-					// this will free synth
-					syns.at(key).at(id).set(\gate,0);
-				});
-			});
+			on.(synthdef,id,args);
+		});
 
-			// create the synth before the main
-			syns.at(key).put(id,Synth.before(syns.at("main"),"synth",args).onFree({
-				["[CopyPasta] stopped playing synth",id].postln;
-			}));
+		this.addCommand("kick_on","", { arg msg;
+			var synthdef="kick";
+			var id=synthdef;
 
-			// watch the new one
-			NodeWatcher.register(syns.at(key).at(id));
+			on.(synthdef,id,[]);
 		});
 
 	}
@@ -215,9 +237,11 @@ Engine_CopyPasta : CroneEngine {
 		bufs.keysValuesDo({ arg buf, val;
 			val.free;
 		});
-		// clear synths
-		syns.keysValuesDo({ arg name, val;
-			val.free;
+		// clear synths (dictionary of dictionaries)
+		syns.keysValuesDo({ arg name, synDict;
+			synDict.keysValuesDo({ arg k,v;
+				v.free;
+			});
 		});
 		// clear buses
 		buses.keysValuesDo({ arg buf, val;
