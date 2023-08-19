@@ -78,6 +78,24 @@ function init()
       redraw()
     end
   end)
+
+  -- setup lattice
+  lattice=lattice_:new{
+    auto=true,
+    ppqn=96
+  }
+
+  -- make some sprockets
+  sprocket=lattice:new_sprocket{
+    action=function(t)
+      for _,p in ipairs(pages) do
+        p:emit()
+      end
+    end,
+    division=1/16,
+    enabled=true
+  }
+
 end
 
 function key(k,z)

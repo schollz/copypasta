@@ -10,7 +10,7 @@ function Kick:new(args)
 end
 
 function Kick:init()
-  self.params={
+  self.prams={
     {id="note",name="note",min=10,max=120,exp=false,div=1,default=32,formatter=function(param) return musicutil.note_num_to_name(param:get(),true) end},
     {id="predb",name="preamp",min=-96,max=16,exp=false,div=0.1,default=0,unit="dB"},
     {id="db",name="postamp",min=-96,max=16,exp=false,div=0.1,default=0,unit="dB"},
@@ -26,8 +26,8 @@ function Kick:init()
     {id="sendReverb",name="reverb send",min=0,max=1,exp=false,div=0.01,default=0,unit="%",
     formatter=function(param) return string.format("%d%%",100*param:get()) end},
   }
-  params:add_group("KICK",#self.params)
-  for _,pram in ipairs(self.params) do
+  params:add_group("KICK",#self.prams)
+  for _,pram in ipairs(self.prams) do
     local id="kick_"..pram.id
     params:add{
       type="control",
@@ -43,12 +43,18 @@ function Kick:init()
 end
 
 function Kick:emit()
-  print("[kick] emit")
-  engine.kick_on()
+  if self.armed then
+    print("[kick] emit")
+    engine.kick_on()
+    self.armed=nil
+  end
 end
 
 function Kick:key(k,z)
   print("[kick] key",k,z)
+  if z==1 then
+    self.armed=true
+  end
 end
 
 function Kick:enc(k,d)
