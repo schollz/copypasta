@@ -95,7 +95,7 @@ function init()
     division=1/16,
     enabled=true
   }
-
+  lattice:start()
 end
 
 function key(k,z)
@@ -103,8 +103,9 @@ function key(k,z)
     installer:key(k,z)
     do return end
   end
-  -- page
-  pages[page_current]:key(k,z)
+  if k>1 then
+    pages[k-1]:key(k,z)
+  end
 end
 
 function enc(k,d)

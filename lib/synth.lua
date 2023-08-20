@@ -40,7 +40,11 @@ function Synth:emit()
   if self.armed then
     print("[kick] emit")
     engine.synth_on(self.armed)
+    self.last_note=self.armed
     self.armed=nil
+  elseif self.armed_off then
+    engine.synth_off(self.last_note)
+    self.armed_off=nil
   end
 end
 
@@ -48,6 +52,8 @@ function Synth:key(k,z)
   print("[synth] key",k,z)
   if z==1 then
     self.armed=32
+  else
+    self.armed_off=true
   end
 end
 
